@@ -1,6 +1,6 @@
 # %%
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "GPU-1ed439f1-d754-f2fc-4f36-f4e1e25ead56"
+os.environ["CUDA_VISIBLE_DEVICES"] = "GPU-edefb71f-8316-c832-8331-94667e51a510"
 from diffusers import StableDiffusionXLPipeline, StableDiffusionXLPipeline_guni, DDIMScheduler
 import torch
 from safetensors.torch import load_file
