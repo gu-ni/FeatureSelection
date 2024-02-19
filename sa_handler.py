@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -41,31 +40,31 @@ class StyleAlignedArgs:
 
 
 def expand_first(feat: T, scale=1.,) -> T:
-    b = feat.shape[0]
-    feat_style = torch.stack((feat[0], feat[b // 2])).unsqueeze(1)
+    b = feat.shape[0] # 8
+    feat_style = torch.stack((feat[0], feat[b // 2])).unsqueeze(1) # torch.Size([2, 1, 10, 1, 64]) -> 8개 중 0번째, 4번째 stack. 아마 첫 번째 prompt의 positive/negative prompt일 듯
     if scale == 1:
-        feat_style = feat_style.expand(2, b // 2, *feat.shape[1:])
+        feat_style = feat_style.expand(2, b // 2, *feat.shape[1:]) # torch.Size([2, 4, 10, 1, 64])
     else:
         feat_style = feat_style.repeat(1, b // 2, 1, 1, 1)
         feat_style = torch.cat([feat_style[:, :1], scale * feat_style[:, 1:]], dim=1)
-    return feat_style.reshape(*feat.shape)
+    return feat_style.reshape(*feat.shape) # torch.Size([8, 10, 4096, 64])
 
 
 def concat_first(feat: T, dim=2, scale=1.) -> T:
-    feat_style = expand_first(feat, scale=scale)
-    return torch.cat((feat, feat_style), dim=dim)
+    feat_style = expand_first(feat, scale=scale) # torch.Size([8, 10, 4096, 64])
+    return torch.cat((feat, feat_style), dim=dim) # torch.Size([8, 10, 8192, 64])
 
 
 def calc_mean_std(feat, eps: float = 1e-5) -> tuple[T, T]:
-    feat_std = (feat.var(dim=-2, keepdims=True) + eps).sqrt()
-    feat_mean = feat.mean(dim=-2, keepdims=True)
+    feat_std = (feat.var(dim=-2, keepdims=True) + eps).sqrt() # torch.Size([8, 10, 1, 64])
+    feat_mean = feat.mean(dim=-2, keepdims=True) # torch.Size([8, 10, 1, 64])
     return feat_mean, feat_std
 
 
 def adain(feat: T) -> T:
-    feat_mean, feat_std = calc_mean_std(feat)
-    feat_style_mean = expand_first(feat_mean)
-    feat_style_std = expand_first(feat_std)
+    feat_mean, feat_std = calc_mean_std(feat) # 둘 다 torch.Size([8, 10, 1, 64])
+    feat_style_mean = expand_first(feat_mean) # torch.Size([8, 10, 1, 64])
+    feat_style_std = expand_first(feat_std) # torch.Size([8, 10, 1, 64])
     feat = (feat - feat_mean) / feat_std
     feat = feat * feat_style_std + feat_style_mean
     return feat
@@ -117,37 +116,37 @@ class SharedAttentionProcessor(DefaultAttentionProcessor):
         if attn.group_norm is not None:
             hidden_states = attn.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
 
-        query = attn.to_q(hidden_states)
+        query = attn.to_q(hidden_states) # torch.Size([8, 4096, 640])
         key = attn.to_k(hidden_states)
         value = attn.to_v(hidden_states)
         inner_dim = key.shape[-1]
         head_dim = inner_dim // attn.heads
 
-        query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
+        query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2) # torch.Size([8, 10, 4096, 64])
         key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
         value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
         # if self.step >= self.start_inject:
         if self.adain_queries:
-            query = adain(query)
+            query = adain(query) # torch.Size([8, 10, 4096, 64])
         if self.adain_keys:
             key = adain(key)
         if self.adain_values:
             value = adain(value)
         if self.share_attention:
-            key = concat_first(key, -2, scale=self.shared_score_scale)
-            value = concat_first(value, -2)
+            key = concat_first(key, -2, scale=self.shared_score_scale) # torch.Size([8, 10, 8192, 64])
+            value = concat_first(value, -2) # torch.Size([8, 10, 8192, 64])
             if self.shared_score_shift != 0:
                 hidden_states = self.shifted_scaled_dot_product_attention(attn, query, key, value,)
             else:
                 hidden_states = nnf.scaled_dot_product_attention(
                     query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False
-                )
+                ) # torch.Size([8, 10, 4096, 64])
         else:
             hidden_states = nnf.scaled_dot_product_attention(
                 query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False
             )
         # hidden_states = adain(hidden_states)
-        hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
+        hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim) # torch.Size([8, 4096, 640])
         hidden_states = hidden_states.to(query.dtype)
 
         # linear proj
@@ -175,7 +174,7 @@ class SharedAttentionProcessor(DefaultAttentionProcessor):
         else:
             hidden_states = self.shared_call(attn, hidden_states, hidden_states, attention_mask, **kwargs)
 
-        return hidden_states
+        return hidden_states # torch.Size([8, 4096, 640])
 
     def __init__(self, style_aligned_args: StyleAlignedArgs):
         super().__init__()
@@ -215,7 +214,7 @@ def init_attention_processors(pipeline: StableDiffusionXLPipeline, style_aligned
     else:
         only_self_vec = _get_switch_vec(num_self_layers, style_aligned_args.only_self_level)
     for i, name in enumerate(unet.attn_processors.keys()):
-        is_self_attention = 'attn1' in name
+        is_self_attention = 'attn1' in name # self attention만
         if is_self_attention:
             number_of_self += 1
             if style_aligned_args is None or only_self_vec[i // 2]:
