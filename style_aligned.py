@@ -1,6 +1,6 @@
 # %%
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "GPU-edefb71f-8316-c832-8331-94667e51a510"
+os.environ["CUDA_VISIBLE_DEVICES"] = "GPU-e7718400-498b-9fe1-4888-1ff1f272a7dc"
 from diffusers import StableDiffusionXLPipeline, StableDiffusionXLPipeline_guni, DDIMScheduler
 import torch
 from safetensors.torch import load_file
@@ -27,9 +27,9 @@ pipeline = StableDiffusionXLPipeline_guni.from_pretrained(
 # %%
 #lora_kwrgs = {"feature_controller": feature_controller}
 lora_kwrgs = {}
-pipeline.load_lora_weights("/workspace/diffusers/examples/dreambooth/output_dir_64rank/NoTE/dog_5e-5_NoTE_1000steps", weight_name="pytorch_lora_weights.safetensors", adapter_name="dog", **lora_kwrgs)
+pipeline.load_lora_weights("/mnt/Face_Private-NFS2/geonhui/works2_ckpt", weight_name="dog_5e-5_NoTE_1000steps.safetensors", adapter_name="dog", **lora_kwrgs)
 #pipeline.load_lora_weights("/workspace/diffusers/examples/dreambooth/output_dir_64rank/NoTE/blue_illu_5e-5_NoTE_1000steps_revised", weight_name="pytorch_lora_weights.safetensors", adapter_name="dog")
-pipeline.load_lora_weights("/workspace/diffusers/examples/dreambooth/output_dir_64rank/NoTE/blue_illu_5e-5_NoTE_1000steps_revised_no_color", weight_name="pytorch_lora_weights.safetensors", adapter_name="style")
+#pipeline.load_lora_weights("/mnt/Face_Private-NFS2/geonhui/works2_ckpt", weight_name="blue_illu_5e-5_NoTE_1000steps_revised_no_color.safetensors", adapter_name="style")
 
 #pipeline.load_lora_weights("/workspace/diffusers/examples/dreambooth/output_dir_64rank/NoTE/tree_sticker_5e-5_NoTE_1000steps", weight_name="pytorch_lora_weights.safetensors", adapter_name="style")
 
@@ -618,7 +618,7 @@ def set_of_prompts(content_description, style_description, style_prefix):
     return [sets_of_prompts1, sets_of_prompts2, sets_of_prompts3]
 
 content_description = 'a ohwx dog'
-style_description = ', with blue plants and shelf on a white background in flat cartoon illustration style, minimal simple vector graphics'
+style_description = ', green and red plants and shelf on a white background in flat cartoon illustration style, minimal simple vector graphics'
 style_prefix = f'a woman'
 #style_description = ', macro photo, 3d game asset'
 #style_prefix = f'a toy train'
@@ -685,9 +685,21 @@ for i, seed in enumerate(woman_seed):
 all_images.show()
 
 # %%
+import torch
 from safetensors.torch import load_file
 import matplotlib.pyplot as plt
 
+style_lora = load_file('/mnt/Face_Private-NFS2/geonhui/works2_ckpt/blue_illu_5e-5_NoTE_1000steps_revised_no_color.safetensors')
+
+# %%
+for attn_processor_name, attn_processor in pipeline.unet.attn_processors.items():
+    # Parse the attention module.
+    attn_module = pipeline.unet
+    for n in attn_processor_name.split(".")[:-1]:
+        attn_module = getattr(attn_module, n)
+    break
+
+# %%
 mergers = []
 content_merger_path = "/workspace/diffusers/examples/dreambooth/64rank_ziplora_output_OutFeatures/dog_and_blue_illu_revised_no_color_save_merger_0.1simlam_SumAbs/dog_merger/merger.safetensors"
 style_merger_path = "/workspace/diffusers/examples/dreambooth/64rank_ziplora_output_OutFeatures/dog_and_blue_illu_revised_no_color_save_merger_0.1simlam_SumAbs/blue_illu_revised_no_color_merger/merger.safetensors"

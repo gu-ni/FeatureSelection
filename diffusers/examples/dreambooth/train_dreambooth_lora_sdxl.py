@@ -57,6 +57,7 @@ from diffusers.training_utils import compute_snr, unet_lora_state_dict
 from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 
+from safetensors.torch import load_file
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 check_min_version("0.24.0.dev0")
@@ -579,6 +580,12 @@ def parse_args(input_args=None):
         default=4,
         help=("The dimension of the LoRA update matrices."),
     )
+    parser.add_argument(
+        "--pretrained_lora_weight_dir",
+        type=str,
+        default="",
+        help=("The dimension of the LoRA update matrices."),
+    )
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -1011,6 +1018,9 @@ def main(args):
 
     # now we will add new LoRA weights to the attention layers
     # Set correct lora layers
+    
+    pretrained_lora_weight = load_file(args.pretrained_lora_weight_dir)
+
     unet_lora_parameters = []
     for attn_processor_name, attn_processor in unet.attn_processors.items():
         # Parse the attention module.
@@ -1024,16 +1034,25 @@ def main(args):
                 in_features=attn_module.to_q.in_features, out_features=attn_module.to_q.out_features, rank=args.rank
             )
         )
+        attn_module.to_q.lora_layer.down.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_q.lora.down.weight'])
+        attn_module.to_q.lora_layer.up.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_q.lora.up.weight'])
+
         attn_module.to_k.set_lora_layer(
             LoRALinearLayer(
                 in_features=attn_module.to_k.in_features, out_features=attn_module.to_k.out_features, rank=args.rank
             )
         )
+        attn_module.to_k.lora_layer.down.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_k.lora.down.weight'])
+        attn_module.to_k.lora_layer.up.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_k.lora.up.weight'])
+
         attn_module.to_v.set_lora_layer(
             LoRALinearLayer(
                 in_features=attn_module.to_v.in_features, out_features=attn_module.to_v.out_features, rank=args.rank
             )
         )
+        attn_module.to_v.lora_layer.down.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_v.lora.down.weight'])
+        attn_module.to_v.lora_layer.up.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_v.lora.up.weight'])
+        
         attn_module.to_out[0].set_lora_layer(
             LoRALinearLayer(
                 in_features=attn_module.to_out[0].in_features,
@@ -1041,6 +1060,8 @@ def main(args):
                 rank=args.rank,
             )
         )
+        attn_module.to_out[0].lora_layer.down.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_out.0.lora.down.weight'])
+        attn_module.to_out[0].lora_layer.up.weight = torch.nn.Parameter(pretrained_lora_weight[f'unet.unet.{".".join(attn_processor_name.split(".")[:-1])}.to_out.0.lora.up.weight'])
 
         # Accumulate the LoRA params to optimize.
         unet_lora_parameters.extend(attn_module.to_q.lora_layer.parameters())
