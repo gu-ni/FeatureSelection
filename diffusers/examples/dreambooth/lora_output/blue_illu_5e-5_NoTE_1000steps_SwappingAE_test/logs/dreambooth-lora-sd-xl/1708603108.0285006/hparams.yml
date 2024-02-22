@@ -23,8 +23,7 @@ hub_model_id: null
 hub_token: null
 image_column: image
 instance_data_dir: image_folder/blue_illu_folder
-instance_prompt: a woman working on laptop with blue plants and shelf on a white background
-  in flat illustration style, minimal simple vector graphics
+instance_prompt: a woman in minimal simple illustration, vector graphics
 learning_rate: 5.0e-05
 local_rank: -1
 logging_dir: logs
@@ -39,8 +38,8 @@ num_class_images: 100
 num_train_epochs: 5
 num_validation_images: 4
 optimizer: AdamW
-output_dir: lora_output/blue_illu_5e-5_NoTE_1000steps_long_long
-pretrained_lora_weight_dir: /mnt/Face_Private-NFS2/geonhui/works2_ckpt/blue_illu_5e-5_NoTE_1000steps_revised_no_color.safetensors
+output_dir: lora_output/blue_illu_5e-5_NoTE_1000steps_SwappingAE_test
+pretrained_lora_weight_dir: ''
 pretrained_model_name_or_path: stabilityai/stable-diffusion-xl-base-1.0
 pretrained_vae_model_name_or_path: madebyollin/sdxl-vae-fp16-fix
 prior_generation_precision: null
@@ -60,12 +59,15 @@ sample_batch_size: 4
 scale_lr: false
 seed: 0
 snr_gamma: null
+swapping_autoencoder_weight: 1.0
 text_encoder_lr: 5.0e-06
 train_batch_size: 1
+train_swapping_autoencoder: true
 train_text_encoder: false
+upscaled_prompt: a woman working on laptop with blue plants and shelf on a white background
+  in flat illustration style, minimal simple vector graphics
 use_8bit_adam: false
 validation_epochs: 7577
-validation_prompt: a woman working on laptop with blue plants and shelf on a white
-  background in flat illustration style, minimal simple vector graphics
+validation_prompt: a woman in minimal simple illustration, vector graphics
 variant: null
 with_prior_preservation: false

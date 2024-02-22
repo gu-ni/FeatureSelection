@@ -1110,7 +1110,7 @@ class DiffusionPipeline(ConfigMixin, PushToHubMixin):
 
         config_dict = cls.load_config(cached_folder)
         
-        config_dict['unet'] = ['diffusers', 'UNet_guni'] ###########
+        #config_dict['unet'] = ['diffusers', 'UNet_guni'] ########### guni
         
         # pop out "_ignore_files" as it is only needed for download
         config_dict.pop("_ignore_files", None)
