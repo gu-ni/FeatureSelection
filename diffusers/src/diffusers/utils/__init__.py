@@ -97,6 +97,8 @@ from .peft_utils import (
     set_adapter_layers,
     set_weights_and_activate_adapters,
     unscale_lora_layers,
+    convey_forward_control_dict,
+    switch_condition,
 )
 from .pil_utils import PIL_INTERPOLATION, make_image_grid, numpy_to_pil, pt_to_pil
 from .state_dict_utils import (

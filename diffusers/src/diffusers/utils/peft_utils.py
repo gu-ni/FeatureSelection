@@ -113,6 +113,22 @@ def scale_lora_layers(model, weight):
         if isinstance(module, BaseTunerLayer):
             module.scale_layer(weight)
 
+# guni
+def convey_forward_control_dict(model, d):
+    from peft.tuners.tuners_utils import BaseTunerLayer
+
+    for module in model.modules():
+        if isinstance(module, BaseTunerLayer):
+            module.set_forward_control_dict(d)
+
+def switch_condition(model, c):
+    #from .....sa_handler_replace import SharedAttentionProcessor_guni
+
+    for name, module in model.attn_processors.items():
+        if hasattr(module, 'share_attention'):
+        #if isinstance(module, SharedAttentionProcessor_guni):
+            module.switch_condition_ = c
+
 
 def unscale_lora_layers(model, weight: Optional[float] = None):
     """

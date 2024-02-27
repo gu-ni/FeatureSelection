@@ -47,6 +47,7 @@ class LoraLayer(BaseTunerLayer):
         self._disable_adapters = False
         self.merged_adapters = []
         self.kwargs = kwargs
+        self.forward_control_dict = {} # guni
 
         base_layer = self.get_base_layer()
         if isinstance(base_layer, nn.Linear):
@@ -155,6 +156,10 @@ class LoraLayer(BaseTunerLayer):
             return
         self.scaling[adapter] = scale * self.lora_alpha[adapter] / self.r[adapter]
 
+    def set_forward_control_dict(self, d):
+        self.forward_control_dict = d
+
+
     def scale_layer(self, scale: float) -> None:
         if scale == 1:
             return
@@ -219,6 +224,7 @@ class Linear(nn.Module, LoraLayer):
         self.scale = kwargs.pop("scale", 1.0)
         self.submodule_name = kwargs.pop("submodule_name", None)
         self.feature_controller = kwargs.pop("feature_controller", None)
+        self.control_dict = kwargs.pop("control_dict", None)
 
     def merge(self, safe_merge: bool = False, adapter_names: Optional[List[str]] = None) -> None:
         """
@@ -475,6 +481,21 @@ class Linear(nn.Module, LoraLayer):
     """
     """
     def forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor: # 240218 특정 token에 대해 lora deactivate
+        control_active_adapter = self.forward_control_dict.get("active_adapter", ['dog', 'style'])
+        control_place_in_unet = self.forward_control_dict.get("place_in_unet", ['down', 'mid', 'up'])
+        control_self_or_cross = self.forward_control_dict.get("self_or_cross", ['self, cross'])
+        control_attn_type = self.forward_control_dict.get("attn_type", ['to_q', 'to_k', 'to_v', 'to_out'])
+        strength = self.forward_control_dict.get("strength", 1.0)
+        timestep = self.forward_control_dict.get("timestep", 1.0)
+        adapt_timestep = self.forward_control_dict.get("adapt_timestep", False)
+
+        if adapt_timestep:
+            ratio = 1.0 - (timestep / 1000)
+            strength *= ratio
+
+            if self.attn_type == 'to_q' and self.self_or_cross == 'self' and self.place_in_unet == 'down':
+                print(ratio)
+
         previous_dtype = x.dtype
 
         if self.disable_adapters:
@@ -485,24 +506,96 @@ class Linear(nn.Module, LoraLayer):
             result = self.base_layer(x, *args, **kwargs)
         else:
             result = self.base_layer(x, *args, **kwargs)
-            if self.self_or_cross == 'cross' and (self.attn_type == 'to_k' or self.attn_type == 'to_v'):
-                pass
-            else:
-                for active_adapter in self.active_adapters:
-                    if active_adapter not in self.lora_A.keys():
-                        continue
-                    lora_A = self.lora_A[active_adapter]
-                    lora_B = self.lora_B[active_adapter]
-                    dropout = self.lora_dropout[active_adapter]
-                    scaling = self.scaling[active_adapter]
-                    x = x.to(lora_A.weight.dtype)
-                    result += lora_B(lora_A(dropout(x))) * scaling
+            for active_adapter in self.active_adapters:
+                if active_adapter not in self.lora_A.keys():
+                    continue
+                lora_A = self.lora_A[active_adapter]
+                lora_B = self.lora_B[active_adapter]
+                dropout = self.lora_dropout[active_adapter]
+                scaling = self.scaling[active_adapter]
+                x = x.to(lora_A.weight.dtype)
+                temp = lora_B(lora_A(dropout(x))) * scaling
+                if active_adapter in control_active_adapter and self.place_in_unet in control_place_in_unet and self.self_or_cross in control_self_or_cross and self.attn_type in control_attn_type:
+                    temp *= strength
+                result += temp
 
         result = result.to(previous_dtype)
         return result
     """
+
+    def forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor: # 240218 특정 token에 대해 lora deactivate
+
+        forward_control_dict_one = self.forward_control_dict.get("forward_control_dict_one", {})
+        forward_control_dict_two = self.forward_control_dict.get("forward_control_dict_two", {})
+        timestep = self.forward_control_dict.get("timestep", 1000)
+
+        place_in_unet_one = forward_control_dict_one.get("place_in_unet", ['down', 'mid', 'up'])
+        self_or_cross_one = forward_control_dict_one.get("self_or_cross", ['self, cross'])
+        attn_type_one = forward_control_dict_one.get("attn_type", ['to_q', 'to_k', 'to_v', 'to_out'])
+        strength_one = forward_control_dict_one.get("strength", {})
+        adapt_timestep_one = forward_control_dict_one.get("adapt_timestep", False)
+
+        place_in_unet_two = forward_control_dict_two.get("place_in_unet", ['down', 'mid', 'up'])
+        self_or_cross_two = forward_control_dict_two.get("self_or_cross", ['self, cross'])
+        attn_type_two = forward_control_dict_two.get("attn_type", ['to_q', 'to_k', 'to_v', 'to_out'])
+        strength_two = forward_control_dict_two.get("strength", {})
+        adapt_timestep_two = forward_control_dict_two.get("adapt_timestep", False)
+
+        if adapt_timestep_one:
+            ratio_one = 1.0 - (timestep / 1000)
+            for value in strength_one.values():
+                value *= ratio_one
+            if self.attn_type == 'to_q' and self.self_or_cross == 'self' and self.place_in_unet == 'down':
+                print(ratio_one)
+        if adapt_timestep_two:
+            ratio_two = 1.0 - (timestep / 1000)
+            for value in strength_two.values():
+                value *= ratio_one
+            if self.attn_type == 'to_q' and self.self_or_cross == 'self' and self.place_in_unet == 'down':
+                print(ratio_two)
+
+        previous_dtype = x.dtype
+
+        if self.disable_adapters:
+            if self.merged:
+                self.unmerge()
+            result = self.base_layer(x, *args, **kwargs)
+        elif self.merged:
+            result = self.base_layer(x, *args, **kwargs)
+        else:
+            result = self.base_layer(x, *args, **kwargs)
+
+            b = x.shape[0]
+
+            for active_adapter in self.active_adapters:
+                if active_adapter not in self.lora_A.keys():
+                    continue
+                lora_A = self.lora_A[active_adapter]
+                lora_B = self.lora_B[active_adapter]
+                dropout = self.lora_dropout[active_adapter]
+                scaling = self.scaling[active_adapter]
+                x = x.to(lora_A.weight.dtype)
+                temp = lora_B(lora_A(dropout(x))) * scaling
+
+                if forward_control_dict_one == forward_control_dict_two:
+                    if active_adapter in strength_one.keys() and self.place_in_unet in place_in_unet_one and self.self_or_cross in self_or_cross_one and self.attn_type in attn_type_one:
+                        temp *= strength_one[active_adapter]
+                else:
+                    if active_adapter in strength_one.keys() and self.place_in_unet in place_in_unet_one and self.self_or_cross in self_or_cross_one and self.attn_type in attn_type_one:
+                        temp[[0, b // 2]] *= strength_one[active_adapter]
+                    if active_adapter in strength_two.keys() and self.place_in_unet in place_in_unet_two and self.self_or_cross in self_or_cross_two and self.attn_type in attn_type_two:
+                        rest_index = list(range(b))
+                        rest_index.remove(0)
+                        rest_index.remove(b // 2)
+                        temp[rest_index] *= strength_two[active_adapter]
+                result += temp
+
+
+        result = result.to(previous_dtype)
+        return result
+
     
-    
+    """
     def forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor: # 원본 forward
         previous_dtype = x.dtype
 
@@ -528,7 +621,7 @@ class Linear(nn.Module, LoraLayer):
 
         result = result.to(previous_dtype)
         return result
-    
+    """
 
     def __repr__(self) -> str:
         rep = super().__repr__()

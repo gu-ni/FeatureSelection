@@ -64,7 +64,7 @@ class BaseTuner(nn.Module, ABC):
     """
 
     def __init__(self, model, peft_config: Union[PeftConfig, dict[str, PeftConfig]], adapter_name: str,
-                 feature_controller) -> None: # guni
+                 feature_controller, control_dict) -> None: # guni
         super().__init__()
 
         self.model = model
@@ -85,7 +85,7 @@ class BaseTuner(nn.Module, ABC):
                 self.peft_config.update(peft_config)
 
         self.active_adapter = adapter_name
-        self.inject_adapter(self.model, adapter_name, feature_controller) # guni
+        self.inject_adapter(self.model, adapter_name, feature_controller, control_dict) # guni
         if feature_controller != None:
             feature_controller.num_att_layers = self.attn_layer_count
 
@@ -185,7 +185,7 @@ class BaseTuner(nn.Module, ABC):
         """
         pass
 
-    def inject_adapter(self, model: nn.Module, adapter_name: str, feature_controller): # guni
+    def inject_adapter(self, model: nn.Module, adapter_name: str, feature_controller, control_dict): # guni
         r"""
         Creates adapter layers and replaces the target modules with the adapter layers. This method is called under the
         hood by `peft.mapping.get_peft_model` if a non-prompt tuning adapter class is passed.
@@ -290,6 +290,7 @@ class BaseTuner(nn.Module, ABC):
             optional_kwargs['scale'] = scale
             optional_kwargs['submodule_name'] = submodule_name
             optional_kwargs['feature_controller'] = feature_controller
+            optional_kwargs['control_dict'] = control_dict
             
             self._create_and_replace(peft_config, adapter_name, target, target_name, parent, **optional_kwargs)
                         

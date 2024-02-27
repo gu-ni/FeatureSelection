@@ -813,6 +813,7 @@ class StableDiffusionXLPipeline(
         clip_skip: Optional[int] = None,
         callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
         callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        forward_control_dict = {},
         **kwargs,
     ):
         r"""
@@ -1138,6 +1139,7 @@ class StableDiffusionXLPipeline(
                     cross_attention_kwargs=self.cross_attention_kwargs,
                     added_cond_kwargs=added_cond_kwargs,
                     return_dict=False,
+                    forward_control_dict=forward_control_dict,
                 )[0]
 
                 # perform guidance

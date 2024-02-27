@@ -157,6 +157,7 @@ class LoraLoaderMixin:
 
         # guni
         feature_controller = kwargs.pop("feature_controller", None)
+        control_dict = kwargs.pop("control_dict", None)
         self.load_lora_into_unet(
             state_dict,
             network_alphas=network_alphas,
@@ -165,6 +166,7 @@ class LoraLoaderMixin:
             adapter_name=adapter_name,
             _pipeline=self,
             feature_controller=feature_controller,
+            control_dict=control_dict,
         )
         self.load_lora_into_text_encoder(
             state_dict,
@@ -503,7 +505,8 @@ class LoraLoaderMixin:
     @classmethod
     def load_lora_into_unet(
         cls, state_dict, network_alphas, unet, low_cpu_mem_usage=None, adapter_name=None, _pipeline=None, 
-        feature_controller=None
+        feature_controller=None,
+        control_dict=None
     ):
         """
         Load LoRA layers specified in `state_dict` into `unet`.
@@ -586,7 +589,8 @@ class LoraLoaderMixin:
 
             # guni
             inject_adapter_in_model(lora_config, unet, adapter_name=adapter_name, 
-                                    feature_controller=feature_controller)
+                                    feature_controller=feature_controller,
+                                    control_dict=control_dict)
             incompatible_keys = set_peft_model_state_dict(unet, state_dict, adapter_name)
 
             if incompatible_keys is not None:
@@ -1771,8 +1775,10 @@ class StableDiffusionXLLoraLoaderMixin(LoraLoaderMixin):
         
         # guni
         feature_controller = kwargs.pop("feature_controller", None)
+        control_dict = kwargs.pop("control_dict", None)
         self.load_lora_into_unet(
-            state_dict, network_alphas=network_alphas, unet=self.unet, adapter_name=adapter_name, _pipeline=self, feature_controller=feature_controller
+            state_dict, network_alphas=network_alphas, unet=self.unet, adapter_name=adapter_name, _pipeline=self, feature_controller=feature_controller,
+            control_dict=control_dict
         )
         text_encoder_state_dict = {k: v for k, v in state_dict.items() if "text_encoder." in k}
         if len(text_encoder_state_dict) > 0:

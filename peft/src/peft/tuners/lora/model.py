@@ -107,8 +107,8 @@ class LoraModel(BaseTuner):
 
     prefix: str = "lora_"
     
-    def __init__(self, model, config, adapter_name, feature_controller) -> None: # guni
-        super().__init__(model, config, adapter_name, feature_controller)
+    def __init__(self, model, config, adapter_name, feature_controller, control_dict) -> None: # guni
+        super().__init__(model, config, adapter_name, feature_controller, control_dict)
 
     def _check_new_adapter_config(self, config: LoraConfig) -> None:
         """
@@ -186,6 +186,7 @@ class LoraModel(BaseTuner):
             kwargs["scale"] = optional_kwargs.pop("scale", 1.0)
             kwargs["submodule_name"] = optional_kwargs.pop("submodule_name", None)
             kwargs["feature_controller"] = optional_kwargs.pop("feature_controller", None)
+            kwargs["control_dict"] = optional_kwargs.pop("control_dict", None)
             new_module = self._create_new_module(lora_config, adapter_name, target, **kwargs)
             if adapter_name != self.active_adapter:
                 # adding an additional adapter: it is not automatically trainable
@@ -535,7 +536,7 @@ class LoraModel(BaseTuner):
             lora_alpha=new_rank,
             target_modules=new_target_modules,
         )
-        self.inject_adapter(self.model, adapter_name) # TODO: guni: feature_controller 수정
+        self.inject_adapter(self.model, adapter_name) # TODO: guni: feature_controller, control_dict 수정
 
         # Do we really need that?
         _freeze_adapter(self.model, adapter_name)

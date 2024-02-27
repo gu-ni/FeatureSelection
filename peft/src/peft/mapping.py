@@ -135,7 +135,8 @@ def get_peft_model(
 
 def inject_adapter_in_model(
     peft_config: PeftConfig, model: torch.nn.Module, adapter_name: str = "default",
-    feature_controller=None, # guni
+    feature_controller=None,
+    control_dict=None, # guni
 ) -> torch.nn.Module:
     r"""
     A simple API to create and inject adapter in-place into a model. Currently the API does not support prompt learning
@@ -162,6 +163,7 @@ def inject_adapter_in_model(
 
     # By instantiating a peft model we are injecting randomly initialized LoRA layers into the model's modules.
     peft_model = tuner_cls(model, peft_config, adapter_name=adapter_name, # guni
-                           feature_controller=feature_controller)
+                           feature_controller=feature_controller,
+                           control_dict=control_dict)
 
     return peft_model.model
